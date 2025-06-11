@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>96juned</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -80,7 +83,7 @@
         }
 
         input[type="hidden"] {
-            display: none; /* Ensure hidden input is not visible */
+            display: none;
         }
 
         .search-container {
@@ -103,8 +106,8 @@
         }
 
         .download-btn {
-            background: #000000; /* Black background for download button */
-            color: #ffffff; /* White text */
+            background: #000000;
+            color: #ffffff;
             border: none;
             padding: 10px;
             width: 100%;
@@ -119,7 +122,7 @@
         }
 
         .delete-btn {
-            background: #ff0000; /* Red background for delete button */
+            background: #ff0000;
             color: white;
             border: none;
             padding: 10px;
@@ -130,16 +133,16 @@
             font-size: 14px;
             transition: transform 0.3s, background 0.3s;
             animation: pulse 2s infinite;
-            display: none; /* Hidden by default */
+            display: inline-block;
         }
 
         #codeBtn {
-            background: #28a745; /* Green background for code button */
+            background: #28a745;
             color: white;
         }
 
         #searchBtn {
-            background: linear-gradient(45deg, #ff4d4d, #4d79ff); /* Unique gradient for search button */
+            background: linear-gradient(45deg, #ff4d4d, #4d79ff);
             color: white;
             border: none;
             padding: 10px;
@@ -176,25 +179,25 @@
         }
 
         .download-btn:hover {
-            background: #333333; /* Slightly lighter black on hover */
+            background: #333333;
             transform: scale(1.05);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         .delete-btn:hover {
-            background: #cc0000; /* Darker red on hover */
+            background: #cc0000;
             transform: scale(1.05);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         #codeBtn:hover {
-            background: #218838; /* Darker green on hover */
+            background: #218838;
             transform: scale(1.05);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         #searchBtn:hover {
-            background: linear-gradient(45deg, #ff6666, #668cff); /* Brighter gradient on hover */
+            background: linear-gradient(45deg, #ff6666, #668cff);
             transform: scale(1.1);
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
         }
@@ -257,13 +260,13 @@
         }
 
         .app-card a {
-            color: #ffffff; /* White text for download button */
+            color: #ffffff;
             text-decoration: none;
             font-weight: bold;
         }
 
         .app-card a:hover {
-            text-decoration: none; /* Remove underline on hover for button */
+            text-decoration: none;
         }
 
         .error {
@@ -301,7 +304,7 @@
         }
 
         #uploadForm {
-            display: none; /* Hidden until code is verified */
+            display: none;
         }
     </style>
 </head>
@@ -331,10 +334,10 @@
                 <input type="text" id="appName" placeholder="App Name" required>
                 <input type="text" id="appPhoto" placeholder="App Photo URL (e.g., Imgur link)" required>
                 <input type="text" id="appLink" placeholder="App Download Link" required>
-                <input type="hidden" id="ownerCode" value="9696" required> <!-- Hidden owner code -->
+                <input type="hidden" id="ownerCode" value="9696" required>
                 <button type="submit">Upload App</button>
             </form>
-            <p id="errorMsg" class="error">Upload Failed: Invalid owner code!</p>
+            <p id="errorMsg" class="error">Upload Failed!</p>
             <p id="successMsg" class="success">Upload Successful!</p>
         </div>
     </div>
@@ -356,6 +359,20 @@
     </div>
 
     <script>
+        // Firebase Configuration (Replace with your Firebase project config)
+        const firebaseConfig = {
+            apiKey: "your-api-key",
+            authDomain: "your-project-id.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project-id.appspot.com",
+            messagingSenderId: "your-messaging-sender-id",
+            appId: "your-app-id"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         const OWNER_CODE = "9696";
         const MAX_APPS = 1000;
         const uploadForm = document.getElementById("uploadForm");
@@ -369,9 +386,22 @@
         const deletePrompt = document.getElementById("deletePrompt");
         const deleteCodeInput = document.getElementById("deleteCodeInput");
 
-        // Simulated app storage (no backend)
         let apps = [];
         let deleteIndex = null;
+
+        // Load apps from Firestore
+        async function loadApps() {
+            try {
+                const snapshot = await db.collection("apps").orderBy("createdAt", "desc").get();
+                apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                displayApps();
+            } catch (error) {
+                console.error("Error loading apps:", error);
+                errorMsg.textContent = "Failed to load apps!";
+                errorMsg.style.display = "block";
+                setTimeout(() => errorMsg.style.display = "none", 3000);
+            }
+        }
 
         // Show code prompt for upload
         function promptCode() {
@@ -390,9 +420,7 @@
                 errorMsg.textContent = "Invalid owner code!";
                 errorMsg.style.display = "block";
                 codePrompt.style.display = "none";
-                setTimeout(() => {
-                    errorMsg.style.display = "none";
-                }, 3000);
+                setTimeout(() => errorMsg.style.display = "none", 3000);
             }
         }
 
@@ -402,7 +430,7 @@
         }
 
         // Upload form submission
-        uploadForm.addEventListener("submit", function (e) {
+        uploadForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             if (apps.length >= MAX_APPS) {
                 errorMsg.textContent = "Upload Failed: App limit of 1,000 reached!";
@@ -413,10 +441,10 @@
 
             const code = document.getElementById("ownerCode").value;
             if (code !== OWNER_CODE) {
-                errorMsg.textContent = "Upload Failed: Invalid owner code!";
+                errorMsg.textContent = "Upload Failed: Invalid Code!";
                 errorMsg.style.display = "block";
                 successMsg.style.display = "none";
-                uploadForm.style.display = "none"; // Hide form if tampered
+                uploadForm.style.display = "none";
                 return;
             }
 
@@ -439,20 +467,35 @@
                 return;
             }
 
-            // Add app to list
-            apps.push({ name: appName, photo: appPhoto, link: appLink });
-            displayApps();
+            try {
+                // Add app to Firestore
+                const docRef = await db.collection("apps").add({
+                    name: appName,
+                    photo: appPhoto,
+                    link: appLink,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
 
-            // Show success message and reset form
-            errorMsg.style.display = "none";
-            successMsg.style.display = "block";
-            uploadForm.reset();
-            document.getElementById("ownerCode").value = "9696"; // Reset hidden code
+                // Update local apps array
+                apps.unshift({ id: docRef.id, name: appName, photo: appPhoto, link: appLink });
+                displayApps();
 
-            // Hide success message after 3 seconds
-            setTimeout(() => {
+                // Clear form and show success
+                errorMsg.style.display = "none";
+                successMsg.style.display = "block";
+                uploadForm.reset();
+                document.getElementById("ownerCode").value = "9696";
+
+                setTimeout(() => {
+                    successMsg.style.display = "none";
+                }, 3000);
+            } catch (error) {
+                console.error("Error uploading app:", error);
+                errorMsg.textContent = "Upload Failed: Error saving to server!";
+                errorMsg.style.display = "block";
                 successMsg.style.display = "none";
-            }, 3000);
+                setTimeout(() => errorMsg.style.display = "none", 3000);
+            }
         });
 
         // Search functionality
@@ -468,6 +511,7 @@
             }
         });
 
+        // Display apps
         function displayApps(query = "") {
             appList.innerHTML = "";
             const filteredApps = apps.filter(app => app.name.toLowerCase().includes(query));
@@ -479,7 +523,7 @@
                 const appCard = document.createElement("div");
                 appCard.className = "app-card";
                 appCard.innerHTML = `
-                    <img src="${app.photo}" alt="${app.name} icon" onerror="this.src='https://via.placeholder.com/100'"/>
+                    <img src="${app.photo}" alt="${app.name}" onerror="this.src='https://via.placeholder.com/100'"/>
                     <div>
                         <h3>${app.name}</h3>
                         <a href="${app.link}" target="_blank" class="download-btn">Download App</a>
@@ -490,6 +534,7 @@
             });
         }
 
+        // Prompt for delete
         function promptDelete(index) {
             deleteIndex = index;
             deletePrompt.style.display = "block";
@@ -497,30 +542,47 @@
             deleteCodeInput.focus();
         }
 
-        function verifyDelete() {
+        // Verify delete
+        async function verifyDelete() {
             const code = deleteCodeInput.value;
             if (code === OWNER_CODE) {
-                apps.splice(deleteIndex, 1);
-                displayApps(searchInput.value.toLowerCase().trim());
-                deletePrompt.style.display = "none";
-                successMsg.textContent = "App deleted successfully!";
-                successMsg.style.display = "block";
-                setTimeout(() => {
-                    successMsg.style.display = "none";
-                }, 3000);
+                try {
+                    // Delete from Firestore
+                    await db.collection("apps").doc(apps[deleteIndex].id).delete();
+                    apps.splice(deleteIndex, 1);
+                    displayApps(searchInput.value.toLowerCase().trim());
+                    deletePrompt.style.display = "none";
+                    successMsg.textContent = "App deleted successfully!";
+                    successMsg.style.display = "block";
+                    setTimeout(() => {
+                        successMsg.style.display = "none";
+                    }, 3000);
+                } catch (error) {
+                    console.error("Error deleting app:", error);
+                    errorMsg.textContent = "Delete Failed: Error saving changes!";
+                    errorMsg.style.display = "block";
+                    setTimeout(() => {
+                        errorMsg.style.display = "none";
+                    }, 3000);
+                }
             } else {
                 errorMsg.textContent = "Delete Failed: Invalid owner code!";
                 errorMsg.style.display = "block";
+                deletePrompt.style.display = "none";
                 setTimeout(() => {
                     errorMsg.style.display = "none";
                 }, 3000);
             }
         }
 
+        // Cancel delete
         function cancelDelete() {
             deletePrompt.style.display = "none";
             deleteIndex = null;
         }
+
+        // Load apps on page load
+        loadApps();
     </script>
 </body>
 </html>
